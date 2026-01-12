@@ -1,8 +1,8 @@
 # Podoh 🍇
 
-**Digital Signage Content Management Platform**
+**Content Management Platform for PVM Displays**
 
-Podoh is a modern, cloud-native digital signage CMS platform for managing PVM (Public View Monitor) devices. It provides a unified RESTful API for content management, scheduling, device synchronization, and security alerts.
+Podoh is a modern, cloud-native platform for managing PVM (Public View Monitor) devices. It provides a unified RESTful API for content management, scheduling, device synchronization, and security alerts.
 
 ---
 
@@ -21,6 +21,14 @@ Podoh is a modern, cloud-native digital signage CMS platform for managing PVM (P
 | [**API Specification**](https://nicechester.github.io/podoh-design/API-Specification-CMS-Server.md) | Complete RESTful API specification with examples |
 | [**Server Design**](https://nicechester.github.io/podoh-design/Design-CMS-Server.md) | Backend architecture, AWS infrastructure, database design |
 | [**OpenAPI Spec**](https://nicechester.github.io/podoh-design/openapi.yaml) | OpenAPI 3.0 specification (YAML) |
+
+### Business Requirements
+
+| Document | Description |
+|----------|-------------|
+| [**BRD - Backend Services**](https://nicechester.github.io/podoh-design/BRD-CMS-Server.md) | Backend API platform requirements |
+| [**BRD - Web Application**](https://nicechester.github.io/podoh-design/BRD-CMS-Software.md) | Frontend web application requirements |
+| [**BRD - PVM Monitor**](https://nicechester.github.io/podoh-design/BRD-SmartAD-PVM-Monitor.md) | PVM hardware device requirements |
 
 ---
 

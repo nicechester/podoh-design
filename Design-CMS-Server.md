@@ -3,7 +3,7 @@
 
 **Document Version:** 2.0  
 **Date:** January 9, 2026  
-**Product:** Podoh Platform - Digital Signage CMS
+**Product:** Podoh Platform
 
 ---
 

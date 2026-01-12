@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Podoh API
   description: |
-    RESTful API for Podoh - Digital Signage Content Management Platform.
+    RESTful API for Podoh - Content Management Platform for PVM displays.
     
     This API provides endpoints for:
     - **Podoh Web Application**: User authentication, device management, content management, scheduling, and reporting
