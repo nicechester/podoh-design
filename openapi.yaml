@@ -1,0 +1,3016 @@
+openapi: 3.0.3
+info:
+  title: Podoh API
+  description: |
+    RESTful API for Podoh - Digital Signage Content Management Platform.
+    
+    This API provides endpoints for:
+    - **Podoh Web Application**: User authentication, device management, content management, scheduling, and reporting
+    - **Android PVM Devices**: Device registration, synchronization, and usage reporting
+    
+    ## Authentication
+    Most endpoints require JWT Bearer token authentication. Obtain tokens via the `/auth/login` endpoint.
+    
+    ## Rate Limiting
+    - Authentication endpoints: 10 requests/minute
+    - Podoh Web APIs: 100 requests/minute
+    - Device Sync APIs: 60 requests/minute per device
+  version: 1.0.0
+  contact:
+    name: Podoh Support
+    url: https://podoh.io
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.podoh.io/api/v1
+    description: Production Server
+  - url: https://api-staging.podoh.io/api/v1
+    description: Staging Server
+  - url: http://localhost:3000/api/v1
+    description: Development Server
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Users
+    description: User account management
+  - name: Groups
+    description: Device group management
+  - name: Devices
+    description: PVM device management
+  - name: Content
+    description: Media content management
+  - name: Schedules
+    description: Schedule and layout management
+  - name: Alerts
+    description: Security alert management
+  - name: Reports
+    description: Usage reports and analytics
+  - name: Device Sync
+    description: APIs for Android PVM device synchronization
+
+paths:
+  # ==================== Authentication ====================
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticates a user and returns access and refresh tokens
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Generates a new access token using a valid refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Invalidates the current session and refresh token
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Logout successful
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Returns the authenticated user's profile information
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Users ====================
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List users
+      description: Returns a paginated list of users. Admin only.
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: role
+          in: query
+          description: Filter by user role
+          schema:
+            $ref: '#/components/schemas/UserRole'
+        - name: groupId
+          in: query
+          description: Filter by group ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Users list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Users
+      summary: Create user
+      description: Creates a new user account. Admin only.
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user
+      description: Returns a specific user by ID
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: User retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: Updates an existing user
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Deletes a user account
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: User deleted
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}/password:
+    post:
+      tags:
+        - Users
+      summary: Change password
+      description: Changes a user's password
+      operationId: changePassword
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid current password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Groups ====================
+  /groups:
+    get:
+      tags:
+        - Groups
+      summary: List groups
+      description: Returns all device groups
+      operationId: listGroups
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Groups list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupsListResponse'
+
+    post:
+      tags:
+        - Groups
+      summary: Create group
+      description: Creates a new device group
+      operationId: createGroup
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '409':
+          description: Group name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /groups/{id}:
+    get:
+      tags:
+        - Groups
+      summary: Get group
+      description: Returns a specific group by ID
+      operationId: getGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GroupIdParam'
+      responses:
+        '200':
+          description: Group retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Groups
+      summary: Update group
+      description: Updates a group's name
+      operationId: updateGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GroupIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroupRequest'
+      responses:
+        '200':
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Groups
+      summary: Delete group
+      description: Deletes a device group
+      operationId: deleteGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GroupIdParam'
+      responses:
+        '204':
+          description: Group deleted
+        '409':
+          description: Cannot delete group with assigned devices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Devices ====================
+  /devices:
+    get:
+      tags:
+        - Devices
+      summary: List devices
+      description: Returns a paginated list of devices
+      operationId: listDevices
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: groupId
+          in: query
+          description: Filter by group ID
+          schema:
+            type: integer
+        - name: status
+          in: query
+          description: Filter by device status
+          schema:
+            $ref: '#/components/schemas/DeviceStatus'
+        - name: search
+          in: query
+          description: Search by name or player ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Devices list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevicesListResponse'
+
+    post:
+      tags:
+        - Devices
+      summary: Register device manually
+      description: Manually registers a new PVM device
+      operationId: createDevice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeviceRequest'
+      responses:
+        '201':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+        '409':
+          description: Player ID already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /devices/{id}:
+    get:
+      tags:
+        - Devices
+      summary: Get device
+      description: Returns detailed information about a specific device
+      operationId: getDevice
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdParam'
+      responses:
+        '200':
+          description: Device retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceDetailResponse'
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Devices
+      summary: Update device
+      description: Updates device information
+      operationId: updateDevice
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeviceRequest'
+      responses:
+        '200':
+          description: Device updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Devices
+      summary: Delete device
+      description: Removes a device registration
+      operationId: deleteDevice
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdParam'
+      responses:
+        '204':
+          description: Device deleted
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /devices/{id}/settings:
+    patch:
+      tags:
+        - Devices
+      summary: Update device settings
+      description: Updates device playback settings
+      operationId: updateDeviceSettings
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceSettingsRequest'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSettingsResponse'
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /devices/{id}/screenshot:
+    get:
+      tags:
+        - Devices
+      summary: Get device screenshot
+      description: Returns the latest screenshot from a device
+      operationId: getDeviceScreenshot
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdParam'
+      responses:
+        '200':
+          description: Screenshot URL retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenshotResponse'
+        '404':
+          description: Device not found or no screenshot available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Content ====================
+  /content:
+    get:
+      tags:
+        - Content
+      summary: List content
+      description: Returns a paginated list of content items
+      operationId: listContent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: groupId
+          in: query
+          description: Filter by group ID
+          schema:
+            type: integer
+        - name: type
+          in: query
+          description: Filter by content type
+          schema:
+            $ref: '#/components/schemas/ContentType'
+        - name: search
+          in: query
+          description: Search by name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Content list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentListResponse'
+
+    post:
+      tags:
+        - Content
+      summary: Upload content
+      description: Uploads new media content
+      operationId: uploadContent
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadContentRequest'
+      responses:
+        '201':
+          description: Content uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentResponse'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported file type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /content/{id}:
+    get:
+      tags:
+        - Content
+      summary: Get content
+      description: Returns details of a specific content item
+      operationId: getContent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ContentIdParam'
+      responses:
+        '200':
+          description: Content retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentDetailResponse'
+        '404':
+          description: Content not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Content
+      summary: Delete content
+      description: Deletes a content item
+      operationId: deleteContent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ContentIdParam'
+      responses:
+        '204':
+          description: Content deleted
+        '409':
+          description: Content is used in active schedules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /content/bulk-delete:
+    post:
+      tags:
+        - Content
+      summary: Bulk delete content
+      description: Deletes multiple content items
+      operationId: bulkDeleteContent
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkDeleteRequest'
+      responses:
+        '200':
+          description: Bulk delete result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkDeleteResponse'
+
+  # ==================== Schedules ====================
+  /schedules:
+    get:
+      tags:
+        - Schedules
+      summary: List schedules
+      description: Returns a paginated list of schedules
+      operationId: listSchedules
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: groupId
+          in: query
+          description: Filter by group ID
+          schema:
+            type: integer
+        - name: search
+          in: query
+          description: Search by name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Schedules list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulesListResponse'
+
+    post:
+      tags:
+        - Schedules
+      summary: Create schedule
+      description: Creates a new schedule with layout and timing
+      operationId: createSchedule
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScheduleRequest'
+      responses:
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleResponse'
+        '400':
+          description: Invalid schedule configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /schedules/{id}:
+    get:
+      tags:
+        - Schedules
+      summary: Get schedule
+      description: Returns a specific schedule with full details
+      operationId: getSchedule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ScheduleIdParam'
+      responses:
+        '200':
+          description: Schedule retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleDetailResponse'
+        '404':
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Schedules
+      summary: Update schedule
+      description: Updates an existing schedule
+      operationId: updateSchedule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ScheduleIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateScheduleRequest'
+      responses:
+        '200':
+          description: Schedule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleResponse'
+        '404':
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Schedules
+      summary: Delete schedule
+      description: Deletes a schedule
+      operationId: deleteSchedule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ScheduleIdParam'
+      responses:
+        '204':
+          description: Schedule deleted
+        '404':
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /schedules/{id}/deploy:
+    post:
+      tags:
+        - Schedules
+      summary: Deploy schedule
+      description: Deploys a schedule to devices
+      operationId: deploySchedule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ScheduleIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeployScheduleRequest'
+      responses:
+        '200':
+          description: Deployment initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentResponse'
+        '404':
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /schedules/{id}/deployments/{deploymentId}:
+    get:
+      tags:
+        - Schedules
+      summary: Get deployment status
+      description: Returns the status of a schedule deployment
+      operationId: getDeploymentStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ScheduleIdParam'
+        - name: deploymentId
+          in: path
+          required: true
+          description: Deployment ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deployment status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentStatusResponse'
+        '404':
+          description: Deployment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Alerts ====================
+  /alerts:
+    get:
+      tags:
+        - Alerts
+      summary: List alerts
+      description: Returns all alert configurations
+      operationId: listAlerts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Alerts list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertsListResponse'
+
+    post:
+      tags:
+        - Alerts
+      summary: Create alert
+      description: Creates a new alert configuration
+      operationId: createAlert
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAlertRequest'
+      responses:
+        '201':
+          description: Alert created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertResponse'
+
+  /alerts/active:
+    get:
+      tags:
+        - Alerts
+      summary: Get active alert
+      description: Returns the currently active alert if any
+      operationId: getActiveAlert
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Active alert status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveAlertResponse'
+
+  /alerts/{id}:
+    get:
+      tags:
+        - Alerts
+      summary: Get alert
+      description: Returns a specific alert configuration
+      operationId: getAlert
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AlertIdParam'
+      responses:
+        '200':
+          description: Alert retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertResponse'
+        '404':
+          description: Alert not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Alerts
+      summary: Delete alert
+      description: Deletes an alert configuration
+      operationId: deleteAlert
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AlertIdParam'
+      responses:
+        '204':
+          description: Alert deleted
+        '404':
+          description: Alert not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /alerts/{id}/deploy:
+    post:
+      tags:
+        - Alerts
+      summary: Deploy alert
+      description: Immediately deploys an alert to devices
+      operationId: deployAlert
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AlertIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeployAlertRequest'
+      responses:
+        '200':
+          description: Alert deployed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDeploymentResponse'
+        '404':
+          description: Alert not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /alerts/{id}/stop:
+    post:
+      tags:
+        - Alerts
+      summary: Stop alert
+      description: Stops an active alert and resumes normal playback
+      operationId: stopAlert
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AlertIdParam'
+      responses:
+        '200':
+          description: Alert stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertStopResponse'
+        '404':
+          description: Alert not found or not active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Reports ====================
+  /reports/usage:
+    get:
+      tags:
+        - Reports
+      summary: Get usage report
+      description: Returns usage statistics for a device
+      operationId: getUsageReport
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: query
+          required: true
+          description: Device ID
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Usage report retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageReportResponse'
+        '400':
+          description: Invalid date range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /reports/usage/export:
+    get:
+      tags:
+        - Reports
+      summary: Export usage report
+      description: Exports usage data as Excel or CSV file
+      operationId: exportUsageReport
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: query
+          description: Device ID (omit for all devices)
+          schema:
+            type: integer
+        - name: groupId
+          in: query
+          description: Group ID
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          description: Export format
+          schema:
+            type: string
+            enum: [xlsx, csv]
+            default: xlsx
+      responses:
+        '200':
+          description: Export file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            text/csv:
+              schema:
+                type: string
+                format: binary
+
+  /reports/groups/{id}/stats:
+    get:
+      tags:
+        - Reports
+      summary: Get group statistics
+      description: Returns aggregated statistics for a group
+      operationId: getGroupStats
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GroupIdParam'
+        - name: startDate
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Group statistics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupStatsResponse'
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Device Sync ====================
+  /sync/register:
+    post:
+      tags:
+        - Device Sync
+      summary: Register device
+      description: Registers a new PVM device with the server
+      operationId: syncRegisterDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncRegisterRequest'
+      responses:
+        '200':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncRegisterResponse'
+
+  /sync/heartbeat:
+    post:
+      tags:
+        - Device Sync
+      summary: Device heartbeat
+      description: Sends device status and checks for updates
+      operationId: syncHeartbeat
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncHeartbeatRequest'
+      responses:
+        '200':
+          description: Heartbeat response with update status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncHeartbeatResponse'
+        '401':
+          description: Invalid device token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sync/schedule:
+    get:
+      tags:
+        - Device Sync
+      summary: Get device schedule
+      description: Retrieves the current schedule for the device
+      operationId: syncGetSchedule
+      security:
+        - deviceAuth: []
+      responses:
+        '200':
+          description: Schedule retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncScheduleResponse'
+        '401':
+          description: Invalid device token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No schedule assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sync/settings:
+    get:
+      tags:
+        - Device Sync
+      summary: Get device settings
+      description: Retrieves device playback settings
+      operationId: syncGetSettings
+      security:
+        - deviceAuth: []
+      responses:
+        '200':
+          description: Settings retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncSettingsResponse'
+        '401':
+          description: Invalid device token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sync/screenshot:
+    post:
+      tags:
+        - Device Sync
+      summary: Upload screenshot
+      description: Uploads a device screenshot
+      operationId: syncUploadScreenshot
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Screenshot image (JPEG)
+                rotation:
+                  type: integer
+                  enum: [0, 90, 180, 270]
+                  description: Screen rotation angle
+      responses:
+        '200':
+          description: Screenshot uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncScreenshotResponse'
+        '401':
+          description: Invalid device token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sync/usage:
+    post:
+      tags:
+        - Device Sync
+      summary: Submit usage log
+      description: Submits playback usage statistics
+      operationId: syncSubmitUsage
+      security:
+        - deviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncUsageRequest'
+      responses:
+        '200':
+          description: Usage log received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncUsageResponse'
+        '401':
+          description: Invalid device token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for Podoh Web users
+    deviceAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Device access token for Android PVM devices
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      description: Items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    UserIdParam:
+      name: id
+      in: path
+      required: true
+      description: User ID
+      schema:
+        type: integer
+    GroupIdParam:
+      name: id
+      in: path
+      required: true
+      description: Group ID
+      schema:
+        type: integer
+    DeviceIdParam:
+      name: id
+      in: path
+      required: true
+      description: Device ID
+      schema:
+        type: integer
+    ContentIdParam:
+      name: id
+      in: path
+      required: true
+      description: Content ID
+      schema:
+        type: integer
+    ScheduleIdParam:
+      name: id
+      in: path
+      required: true
+      description: Schedule ID
+      schema:
+        type: integer
+    AlertIdParam:
+      name: id
+      in: path
+      required: true
+      description: Alert ID
+      schema:
+        type: integer
+
+  schemas:
+    # ==================== Enums ====================
+    UserRole:
+      type: string
+      enum: [admin, manager, user]
+      description: User role
+
+    DeviceStatus:
+      type: string
+      enum: [online, offline]
+      description: Device connection status
+
+    ContentType:
+      type: string
+      enum: [video, image, html, stream]
+      description: Content media type
+
+    ZoneType:
+      type: string
+      enum: [video, image, logo, clock, subtitle, newsTicker, html, wallpaper, camera]
+      description: Layout zone type
+
+    AspectRatio:
+      type: string
+      enum: ['16:9', '4:3', '5:4', '16:4.5']
+      description: Display aspect ratio
+
+    Rotation:
+      type: integer
+      enum: [0, 90, 180, 270]
+      description: Display rotation in degrees
+
+    DayOfWeek:
+      type: string
+      enum: [mon, tue, wed, thu, fri, sat, sun]
+      description: Day of week
+
+    # ==================== Common Objects ====================
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 100
+        totalPages:
+          type: integer
+          example: 5
+
+    GroupRef:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: California
+
+    Position:
+      type: object
+      required:
+        - left
+        - top
+        - right
+        - bottom
+      properties:
+        left:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Left position (percentage)
+        top:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Top position (percentage)
+        right:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Right position (percentage)
+        bottom:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Bottom position (percentage)
+
+    Zone:
+      type: object
+      required:
+        - id
+        - type
+        - position
+      properties:
+        id:
+          type: string
+          example: video-main
+        type:
+          $ref: '#/components/schemas/ZoneType'
+        layer:
+          type: integer
+          description: Z-index layer (0-11)
+        position:
+          $ref: '#/components/schemas/Position'
+        contentIds:
+          type: array
+          items:
+            type: integer
+          description: Content IDs assigned to this zone
+        settings:
+          type: object
+          description: Zone-specific settings
+
+    SubSchedule:
+      type: object
+      required:
+        - playbackStart
+        - playbackEnd
+        - daysOfWeek
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: Business Hours
+        playbackStart:
+          type: string
+          pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+          example: '08:00'
+        playbackEnd:
+          type: string
+          pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+          example: '22:00'
+        daysOfWeek:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayOfWeek'
+        repeat:
+          type: boolean
+          default: true
+
+    # ==================== Response Wrappers ====================
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: RESOURCE_NOT_FOUND
+            message:
+              type: string
+              example: The requested resource was not found
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+
+    MessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+
+    # ==================== Auth Schemas ====================
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: password123
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+            expiresIn:
+              type: integer
+              example: 3600
+            tokenType:
+              type: string
+              example: Bearer
+            user:
+              $ref: '#/components/schemas/User'
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+
+    RefreshTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+            expiresIn:
+              type: integer
+              example: 3600
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/User'
+
+    # ==================== User Schemas ====================
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: admin
+        role:
+          $ref: '#/components/schemas/UserRole'
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+        phone:
+          type: string
+          example: '+1-555-0100'
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupRef'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - password
+        - role
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        password:
+          type: string
+          format: password
+          minLength: 8
+        role:
+          $ref: '#/components/schemas/UserRole'
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        groupIds:
+          type: array
+          items:
+            type: integer
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        groupIds:
+          type: array
+          items:
+            type: integer
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+          format: password
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+
+    UsersListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        meta:
+          $ref: '#/components/schemas/Pagination'
+
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/User'
+
+    # ==================== Group Schemas ====================
+    Group:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: California
+        deviceCount:
+          type: integer
+          example: 15
+        contentCount:
+          type: integer
+          example: 42
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateGroupRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    UpdateGroupRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    GroupsListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+
+    GroupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Group'
+
+    # ==================== Device Schemas ====================
+    Device:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        playerId:
+          type: string
+          example: PVM-ABC123DEF456
+        name:
+          type: string
+          example: Store #101 - Main Entrance
+        group:
+          $ref: '#/components/schemas/GroupRef'
+        status:
+          $ref: '#/components/schemas/DeviceStatus'
+        ipAddress:
+          type: string
+          example: 192.168.1.100
+        lastSeen:
+          type: string
+          format: date-time
+        currentSchedule:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            version:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    DeviceDetail:
+      allOf:
+        - $ref: '#/components/schemas/Device'
+        - type: object
+          properties:
+            systemInfo:
+              type: object
+              properties:
+                model:
+                  type: string
+                  example: PVM-4200
+                osVersion:
+                  type: string
+                  example: Android 11
+                appVersion:
+                  type: string
+                  example: 2.0.1
+                freeMemory:
+                  type: integer
+                totalMemory:
+                  type: integer
+                macAddress:
+                  type: string
+            settings:
+              $ref: '#/components/schemas/DeviceSettings'
+
+    DeviceSettings:
+      type: object
+      properties:
+        audioVolume:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 50
+        subtitleEnabled:
+          type: boolean
+        rssEnabled:
+          type: boolean
+        rssUrl:
+          type: string
+          format: uri
+
+    CreateDeviceRequest:
+      type: object
+      required:
+        - playerId
+        - name
+        - groupId
+      properties:
+        playerId:
+          type: string
+          description: Unique device identifier from PVM
+        name:
+          type: string
+        groupId:
+          type: integer
+
+    UpdateDeviceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        groupId:
+          type: integer
+
+    DeviceSettingsRequest:
+      type: object
+      properties:
+        audioVolume:
+          type: integer
+          minimum: 0
+          maximum: 100
+        subtitleEnabled:
+          type: boolean
+        rssEnabled:
+          type: boolean
+        rssUrl:
+          type: string
+          format: uri
+
+    DevicesListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+        meta:
+          $ref: '#/components/schemas/Pagination'
+
+    DeviceResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Device'
+
+    DeviceDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/DeviceDetail'
+
+    DeviceSettingsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/DeviceSettings'
+
+    ScreenshotResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            url:
+              type: string
+              format: uri
+            capturedAt:
+              type: string
+              format: date-time
+            rotation:
+              type: integer
+
+    # ==================== Content Schemas ====================
+    Content:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: promo_video.mp4
+        type:
+          $ref: '#/components/schemas/ContentType'
+        fileSize:
+          type: integer
+          example: 47396044
+        mimeType:
+          type: string
+          example: video/mp4
+        duration:
+          type: integer
+          description: Duration in seconds (for video)
+        resolution:
+          type: string
+          example: 1920x1080
+        group:
+          $ref: '#/components/schemas/GroupRef'
+        thumbnailUrl:
+          type: string
+          format: uri
+        downloadUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+
+    ContentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Content'
+        - type: object
+          properties:
+            hash:
+              type: string
+              description: File content hash for change detection
+            usedInSchedules:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+
+    UploadContentRequest:
+      type: object
+      required:
+        - type
+        - groupId
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Media file (for video/image types)
+        url:
+          type: string
+          format: uri
+          description: URL (for html/stream types)
+        type:
+          $ref: '#/components/schemas/ContentType'
+        groupId:
+          type: integer
+        name:
+          type: string
+          description: Custom name (defaults to filename)
+
+    BulkDeleteRequest:
+      type: object
+      required:
+        - ids
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+
+    BulkDeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            deleted:
+              type: array
+              items:
+                type: integer
+            failed:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  reason:
+                    type: string
+
+    ContentListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Content'
+        meta:
+          $ref: '#/components/schemas/Pagination'
+
+    ContentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Content'
+
+    ContentDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ContentDetail'
+
+    # ==================== Schedule Schemas ====================
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        name:
+          type: string
+          example: January Promotions
+        group:
+          $ref: '#/components/schemas/GroupRef'
+        version:
+          type: integer
+          example: 3
+        aspectRatio:
+          $ref: '#/components/schemas/AspectRatio'
+        rotation:
+          $ref: '#/components/schemas/Rotation'
+        deployedDevices:
+          type: integer
+        totalDevices:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ScheduleDetail:
+      allOf:
+        - $ref: '#/components/schemas/Schedule'
+        - type: object
+          properties:
+            layout:
+              type: object
+              properties:
+                zones:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Zone'
+            timing:
+              type: object
+              properties:
+                subSchedules:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SubSchedule'
+                defaultImageDisplayTime:
+                  type: integer
+                  example: 10
+            deployments:
+              type: array
+              items:
+                type: object
+                properties:
+                  deviceId:
+                    type: integer
+                  deviceName:
+                    type: string
+                  status:
+                    type: string
+                  deployedAt:
+                    type: string
+                    format: date-time
+
+    CreateScheduleRequest:
+      type: object
+      required:
+        - name
+        - groupId
+        - layout
+      properties:
+        name:
+          type: string
+        groupId:
+          type: integer
+        aspectRatio:
+          $ref: '#/components/schemas/AspectRatio'
+        rotation:
+          $ref: '#/components/schemas/Rotation'
+        layout:
+          type: object
+          properties:
+            zones:
+              type: array
+              items:
+                $ref: '#/components/schemas/Zone'
+        timing:
+          type: object
+          properties:
+            subSchedules:
+              type: array
+              items:
+                $ref: '#/components/schemas/SubSchedule'
+
+    UpdateScheduleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        aspectRatio:
+          $ref: '#/components/schemas/AspectRatio'
+        rotation:
+          $ref: '#/components/schemas/Rotation'
+        layout:
+          type: object
+          properties:
+            zones:
+              type: array
+              items:
+                $ref: '#/components/schemas/Zone'
+        timing:
+          type: object
+          properties:
+            subSchedules:
+              type: array
+              items:
+                $ref: '#/components/schemas/SubSchedule'
+
+    DeployScheduleRequest:
+      type: object
+      properties:
+        deviceIds:
+          type: array
+          items:
+            type: integer
+          description: Specific device IDs to deploy to
+        deployAll:
+          type: boolean
+          default: false
+          description: Deploy to all devices in the group
+
+    DeploymentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            deploymentId:
+              type: string
+            scheduleId:
+              type: integer
+            scheduleName:
+              type: string
+            scheduleVersion:
+              type: integer
+            targetDevices:
+              type: integer
+            status:
+              type: string
+              enum: [pending, in_progress, completed, failed]
+            initiatedAt:
+              type: string
+              format: date-time
+
+    DeploymentStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            deploymentId:
+              type: string
+            scheduleId:
+              type: integer
+            status:
+              type: string
+              enum: [pending, in_progress, completed, failed]
+            targetDevices:
+              type: integer
+            completedDevices:
+              type: integer
+            failedDevices:
+              type: integer
+            deviceStatuses:
+              type: array
+              items:
+                type: object
+                properties:
+                  deviceId:
+                    type: integer
+                  deviceName:
+                    type: string
+                  status:
+                    type: string
+            initiatedAt:
+              type: string
+              format: date-time
+            completedAt:
+              type: string
+              format: date-time
+
+    SchedulesListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Schedule'
+        meta:
+          $ref: '#/components/schemas/Pagination'
+
+    ScheduleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Schedule'
+
+    ScheduleDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ScheduleDetail'
+
+    # ==================== Alert Schemas ====================
+    Alert:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Emergency Evacuation
+        content:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            type:
+              $ref: '#/components/schemas/ContentType'
+            thumbnailUrl:
+              type: string
+              format: uri
+        isActive:
+          type: boolean
+        lastDeployedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateAlertRequest:
+      type: object
+      required:
+        - name
+        - contentId
+      properties:
+        name:
+          type: string
+        contentId:
+          type: integer
+
+    DeployAlertRequest:
+      type: object
+      properties:
+        groupIds:
+          type: array
+          items:
+            type: integer
+          description: Specific group IDs to deploy to
+        deployAll:
+          type: boolean
+          default: false
+          description: Deploy to all groups
+
+    AlertDeploymentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            alertId:
+              type: integer
+            alertName:
+              type: string
+            status:
+              type: string
+              example: active
+            targetGroups:
+              type: array
+              items:
+                type: string
+            targetDevices:
+              type: integer
+            deployedAt:
+              type: string
+              format: date-time
+
+    AlertStopResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            alertId:
+              type: integer
+            alertName:
+              type: string
+            status:
+              type: string
+              example: stopped
+            stoppedAt:
+              type: string
+              format: date-time
+            duration:
+              type: string
+              example: '00:30:00'
+
+    ActiveAlertResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Alert'
+            - type: object
+              properties:
+                targetGroups:
+                  type: array
+                  items:
+                    type: string
+                deployedAt:
+                  type: string
+                  format: date-time
+
+    AlertsListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+
+    AlertResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Alert'
+
+    # ==================== Report Schemas ====================
+    UsageReportResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            device:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                group:
+                  type: string
+            period:
+              type: object
+              properties:
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+            summary:
+              type: object
+              properties:
+                totalPlayTime:
+                  type: integer
+                  description: Total play time in seconds
+                totalPlayTimeFormatted:
+                  type: string
+                  example: '240:00:00'
+                contentPlayed:
+                  type: integer
+                averageDailyUptime:
+                  type: string
+            contentUsage:
+              type: array
+              items:
+                type: object
+                properties:
+                  contentId:
+                    type: integer
+                  contentName:
+                    type: string
+                  contentType:
+                    $ref: '#/components/schemas/ContentType'
+                  playCount:
+                    type: integer
+                  totalPlayTime:
+                    type: integer
+                  totalPlayTimeFormatted:
+                    type: string
+            dailyStats:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  uptimeSeconds:
+                    type: integer
+                  uptimeFormatted:
+                    type: string
+
+    GroupStatsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            group:
+              $ref: '#/components/schemas/GroupRef'
+            period:
+              type: object
+              properties:
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+            deviceStats:
+              type: object
+              properties:
+                totalDevices:
+                  type: integer
+                onlineDevices:
+                  type: integer
+                offlineDevices:
+                  type: integer
+                averageUptime:
+                  type: string
+            contentStats:
+              type: object
+              properties:
+                totalContent:
+                  type: integer
+                mostPlayedContent:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      playCount:
+                        type: integer
+
+    # ==================== Device Sync Schemas ====================
+    SyncRegisterRequest:
+      type: object
+      required:
+        - playerId
+        - macAddress
+      properties:
+        playerId:
+          type: string
+          example: PVM-ABC123DEF456
+        macAddress:
+          type: string
+          example: 'AA:BB:CC:DD:EE:FF'
+        deviceInfo:
+          type: object
+          properties:
+            model:
+              type: string
+            osVersion:
+              type: string
+            appVersion:
+              type: string
+
+    SyncRegisterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            deviceId:
+              type: integer
+            playerId:
+              type: string
+            status:
+              type: string
+              enum: [registered, already_registered]
+            accessToken:
+              type: string
+              description: Device access token for subsequent API calls
+            serverTime:
+              type: string
+              format: date-time
+
+    SyncHeartbeatRequest:
+      type: object
+      required:
+        - playerId
+        - status
+      properties:
+        playerId:
+          type: string
+        status:
+          type: string
+          enum: [idle, playing, downloading, error]
+        ipAddress:
+          type: string
+        currentScheduleVersion:
+          type: integer
+        systemInfo:
+          type: object
+          properties:
+            freeMemory:
+              type: integer
+            totalMemory:
+              type: integer
+            cpuUsage:
+              type: integer
+
+    SyncHeartbeatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            serverTime:
+              type: string
+              format: date-time
+            hasScheduleUpdate:
+              type: boolean
+            scheduleVersion:
+              type: integer
+            hasSettingsUpdate:
+              type: boolean
+            hasAlert:
+              type: boolean
+            alert:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                contentUrl:
+                  type: string
+                  format: uri
+                contentType:
+                  $ref: '#/components/schemas/ContentType'
+
+    SyncScheduleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            scheduleId:
+              type: integer
+            scheduleName:
+              type: string
+            version:
+              type: integer
+            aspectRatio:
+              $ref: '#/components/schemas/AspectRatio'
+            rotation:
+              $ref: '#/components/schemas/Rotation'
+            layout:
+              type: object
+              properties:
+                zones:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      type:
+                        $ref: '#/components/schemas/ZoneType'
+                      layer:
+                        type: integer
+                      position:
+                        $ref: '#/components/schemas/Position'
+                      content:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            url:
+                              type: string
+                              format: uri
+                            hash:
+                              type: string
+                            fileSize:
+                              type: integer
+                            duration:
+                              type: integer
+                      settings:
+                        type: object
+            timing:
+              type: object
+              properties:
+                subSchedules:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SubSchedule'
+                defaultImageDisplayTime:
+                  type: integer
+
+    SyncSettingsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            audioVolume:
+              type: integer
+            subtitleEnabled:
+              type: boolean
+            subtitleText:
+              type: string
+            rssEnabled:
+              type: boolean
+            rssUrl:
+              type: string
+              format: uri
+            syncInterval:
+              type: integer
+              description: Heartbeat interval in seconds
+            screenshotInterval:
+              type: integer
+              description: Screenshot upload interval in seconds
+
+    SyncScreenshotResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            uploaded:
+              type: boolean
+            timestamp:
+              type: string
+              format: date-time
+
+    SyncUsageRequest:
+      type: object
+      required:
+        - playerId
+        - date
+        - logs
+      properties:
+        playerId:
+          type: string
+        date:
+          type: string
+          format: date
+        logs:
+          type: array
+          items:
+            type: object
+            required:
+              - contentName
+              - contentType
+              - playTimeSeconds
+            properties:
+              contentName:
+                type: string
+              contentType:
+                $ref: '#/components/schemas/ContentType'
+              playTimeSeconds:
+                type: integer
+              playCount:
+                type: integer
+
+    SyncUsageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            received:
+              type: boolean
+            logCount:
+              type: integer
+
